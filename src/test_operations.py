@@ -177,6 +177,27 @@ class TestIngest(unittest.TestCase):
                 ]
         self.assertEqual(split,text_to_textnodes(text))
 
+class TestTextNodes2HtmlNodes(unittest.TestCase):
+    def test_do_they_all_leaves(self):
+        text = "This is **text** with an *italic* word and a `code block` and an \
+![obi wan image](https://i.imgur.com/fJRm4Vk.jpeg) and a [link](https://boot.dev)"
+        split = [
+                LeafNode(None,"This is "),
+                LeafNode("b","text"),
+                LeafNode(None," with an "),
+                LeafNode("i", "italic"),
+                LeafNode(None," word and a "),
+                LeafNode("code", "code block"),
+                LeafNode(None," and an "),
+                LeafNode("img", "", {'src':'https://i.imgur.com/fJRm4Vk.jpeg','alt':'obi wan image'}),
+                LeafNode(None," and a "),
+                LeafNode("a", "link", {'href':'https://boot.dev'}),
+                ]
+        self.assertEqual(split,textnodes_to_htmlnodes(text))
+        self.assertEqual(list, type(textnodes_to_htmlnodes(text)))
+        self.assertNotEqual(list, type(textnodes_to_htmlnodes(text)[0]))
+        self.assertEqual(LeafNode, type(textnodes_to_htmlnodes(text)[0]))
+
 class TestMarkdown2Block(unittest.TestCase):
     def test_blocks(self):
         text = '''Hello world, this is **cool text**
@@ -227,6 +248,88 @@ class TestMarkdown2Block(unittest.TestCase):
                 ]
 
         self.assertEqual(blocks, markdown_to_blocks(text))
+
+    def test_blocks_long(self):
+        text = '''Hello world, this is **cool text**
+
+        additionally, this is a second paragraph
+this is an additional sentence in this block
+
+
+
+        finally, *this* is the last paragraph
+        '''
+        blocks = [
+                'Hello world, this is **cool text**',
+                'additionally, this is a second paragraph\nthis is an additional sentence in this block',
+                'finally, *this* is the last paragraph',
+                ]
+
+        self.assertEqual(blocks, markdown_to_blocks(text))
+
+class TestBlock2BlockType(unittest.TestCase):
+    def test_heading3(self):
+        block = "### Hello world"
+        block_type = "h3"
+
+        self.assertEqual(block_type, block_to_block_type(block))
+
+    def test_code(self):
+        block = "```\nHello world\n```"
+        block_type = "code"
+
+        self.assertEqual(block_type, block_to_block_type(block))
+
+    def test_quote(self):
+        block = "> hello\n> world"
+        block_type = "quote"
+
+        self.assertEqual(block_type, block_to_block_type(block))
+
+    def test_unordered(self):
+        block = "- hello\n- world"
+        block_type = "unordered_list"
+
+        self.assertEqual(block_type, block_to_block_type(block))
+
+    def test_ordered(self):
+        block = "1. hello\n2. world"
+        block_type = "ordered_list"
+
+        self.assertEqual(block_type, block_to_block_type(block))
+
+    def test_other(self):
+        block = "hello\nworld"
+        block_type = "paragraph"
+
+        self.assertEqual(block_type, block_to_block_type(block))
+
+class TestMD2HTMLnodes(unittest.TestCase):
+    def test_basic(self):
+        markdown = '''
+        # The title
+
+        This is a cool *document* that is written
+this is another line
+
+        On a computer at [moricorp](moricorp.xyz)
+        '''
+        html = ParentNode('div',[
+            ParentNode('h1',[LeafNode(None,'The title')]),
+            ParentNode('paragraph',[
+            LeafNode(None,'This is a cool '),
+            LeafNode('i','document'),
+            LeafNode(None, ' that is written\nthis is another line'),
+            ]),
+            ParentNode('paragraph',[
+                LeafNode(None, 'On a computer at '),
+                LeafNode('a', 'moricorp',{'href':'moricorp.xyz'}),
+                ]),
+            ])
+
+
+        self.assertEqual(html, markdown_to_html_node(markdown))
+
 
 if __name__ == '__main__':
     unittest.main()

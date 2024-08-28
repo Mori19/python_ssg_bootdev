@@ -130,15 +130,6 @@ def split_nodes_links(nodes):
     return reduce(inner, nodes, [])
 
 def text_to_textnodes(text):
-    '''res = split_nodes_links([TextNode(text,'text')])
-    print(f'take 1 {res}' )
-    res = split_nodes_delimiter(res, '**', 'bold')
-    print(f'take 2 {res}')
-    res = split_nodes_delimiter(res, '*', 'italic')
-    print(f'take 3 {res}')
-    res = split_nodes_delimiter(res, '`', 'code')
-    print(res)
-    return res'''
     return split_nodes_delimiter(
             split_nodes_delimiter(
                 split_nodes_delimiter(
@@ -146,6 +137,10 @@ def text_to_textnodes(text):
                     '**', 'bold'),
                 '*', 'italic'),
             '`', 'code')
+def textnodes_to_htmlnodes(textnodes):
+    textnodes = text_to_textnodes(textnodes)
+    a =  list(map(lambda a : text_node_to_html_node(a) if isinstance(a, TextNode) else a, textnodes))
+    return a
 
 def markdown_to_blocks(markdown):
     markdown = markdown.strip()
@@ -156,3 +151,53 @@ def markdown_to_blocks(markdown):
         end = b.index('\n\n')
         return a + [b[:end].strip()] + cut([],b[end:])
     return cut([],markdown)
+
+def ordered_list_checker(l):
+    for i in range(len(l)):
+        if l[i][:len(f'{str(i+1)}. ')] != f'{str(i+1)}. ':
+            return False
+    return True
+
+def block_to_block_type(block):
+    lines = block.split('\n')
+    if lines[0][0] == "#":
+        def count(l):
+            if l[0] == ' ':
+                return 0
+            elif l[0] == '#':
+                return 1 + count(l[1:])
+            else:
+                return 'uh oh' #this is obviously incorreclty implemented 
+        return f"h{count(lines[0])}"
+    elif lines[0] == '```' and lines[-1] == '```':
+        return 'code'
+    elif all([line[0:2] == '> ' for line in lines]):
+           return "quote"
+    elif all([line[0:2] == '* ' for line in lines]) or all([line[0] == '-' for line in lines]):
+        return 'unordered_list'
+    elif ordered_list_checker(lines):
+        return 'ordered_list'
+    else: 
+        return 'paragraph'
+
+def block_stripper(block):
+    t = block_to_block_type(block)
+    if t[0] == 'h':
+        return block[int(t[1])+1:]
+    elif t == 'code':
+        return '\n'.join(blocks.split('\n')[1:-1])
+    elif t in ['quote','ordered_list','unordered_list']:
+        return '\n'.join([line[line.index(' ')+1:] for line in block.split('\n')])
+    else:
+        return block
+
+def blocks_to_htmlnode(blocks):
+    return  list(map(lambda block: ParentNode(block_to_block_type(block),
+                                             textnodes_to_htmlnodes(block_stripper(block))), blocks))
+
+def markdown_to_html_node(markdown):
+    return ParentNode('div',
+                      blocks_to_htmlnode(
+                          markdown_to_blocks(markdown)
+                          )
+                      )
