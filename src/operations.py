@@ -2,6 +2,7 @@ from functools import reduce
 from re import search
 from textnode import *
 from htmlnode import *
+import os
 
 def split_nodes_delimiter(nodes, delim, text_type):
     def cut(a,b):
@@ -172,24 +173,27 @@ def block_to_block_type(block):
     elif lines[0] == '```' and lines[-1] == '```':
         return 'code'
     elif all([line[0:2] == '> ' for line in lines]):
-           return "quote"
-    elif all([line[0:2] == '* ' for line in lines]) or all([line[0] == '-' for line in lines]):
-        return 'unordered_list'
+           return "blockquote"
+    elif all([line[0:2] == '* ' for line in lines]) or all([line[0:2] == '- ' for line in lines]):
+        return 'ul'
     elif ordered_list_checker(lines):
-        return 'ordered_list'
+        return 'ol'
     else: 
-        return 'paragraph'
+        return 'p'
 
 def block_stripper(block):
     t = block_to_block_type(block)
     if t[0] == 'h':
         return block[int(t[1])+1:]
     elif t == 'code':
-        return '\n'.join(blocks.split('\n')[1:-1])
-    elif t in ['quote','ordered_list','unordered_list']:
+        return '\n'.join(block.split('\n')[1:-1])
+    elif t == 'blockquote':
         return '\n'.join([line[line.index(' ')+1:] for line in block.split('\n')])
+    elif t in ['ul','ol']:
+        return '\n'.join([f"<li>{line[line.index(' ')+1:]}</li>" for line in block.split('\n')])
     else:
         return block
+
 
 def blocks_to_htmlnode(blocks):
     return  list(map(lambda block: ParentNode(block_to_block_type(block),
@@ -201,3 +205,35 @@ def markdown_to_html_node(markdown):
                           markdown_to_blocks(markdown)
                           )
                       )
+def extract_title(htmlnode):
+    for node in htmlnode.children:
+        if isinstance(node, ParentNode) and node.tag == 'h1':
+            return node.children[0].value
+    raise Exception("No title found")
+
+def generate_page(src,template,dst):
+    dst_path = dst.split('/')
+    if len(dst_path) > 1:
+        os.makedirs('/'.join(dst_path[:-1]), exist_ok=True)
+    with open(src) as f:
+        md = f.read()
+    with open(template) as f:
+        t = f.read()
+    doc = markdown_to_html_node(md)
+    title = extract_title(doc)
+    t = t.replace('{{ Title }}', title)
+    t = t.replace('{{ Content }}', doc.to_html())
+    with open(dst, 'w') as f:
+        f.write(t)
+
+def generate_page_recursive(src_path,template_path,dst_path):
+    here = os.listdir(src_path)
+    list(map(lambda a: print(f'Generating path: {dst_path}/{a}') if os.path.isfile(f'{src_path}/{a}') else '', here))
+    list(map(lambda a : \
+            generate_page(f'{src_path}/{a}',
+                          template_path,
+                          f'{dst_path}/{a.replace(".md",".html")}') \
+                                  if os.path.isfile(f'{src_path}/{a}') \
+                                  else generate_page_recursive(f'{src_path}/{a}',
+                                                               template_path,
+                                                               f'{dst_path}/{a}'), here))

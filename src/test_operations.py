@@ -282,27 +282,42 @@ class TestBlock2BlockType(unittest.TestCase):
 
     def test_quote(self):
         block = "> hello\n> world"
-        block_type = "quote"
+        block_type = "blockquote"
 
         self.assertEqual(block_type, block_to_block_type(block))
 
     def test_unordered(self):
         block = "- hello\n- world"
-        block_type = "unordered_list"
+        block_type = "ul"
 
         self.assertEqual(block_type, block_to_block_type(block))
 
     def test_ordered(self):
         block = "1. hello\n2. world"
-        block_type = "ordered_list"
+        block_type = "ol"
 
         self.assertEqual(block_type, block_to_block_type(block))
 
     def test_other(self):
         block = "hello\nworld"
-        block_type = "paragraph"
+        block_type = "p"
 
         self.assertEqual(block_type, block_to_block_type(block))
+
+class TestExtractTitle(unittest.TestCase):
+    def test_basic(self):
+        html = ParentNode('div',[
+            ParentNode('h2',[LeafNode(None,'fail')]),
+            ParentNode('h1',[LeafNode(None,'test')]),
+            ])
+        self.assertEqual('test',extract_title(html))
+        # The title
+    def test_fail(self):
+        html = ParentNode('div',[
+            ParentNode('h2',[LeafNode(None,'fail')]),
+            ParentNode('h3',[LeafNode(None,'test')]),
+            ])
+        self.assertRaises(Exception,extract_title,html)
 
 class TestMD2HTMLnodes(unittest.TestCase):
     def test_basic(self):
@@ -316,14 +331,39 @@ this is another line
         '''
         html = ParentNode('div',[
             ParentNode('h1',[LeafNode(None,'The title')]),
-            ParentNode('paragraph',[
+            ParentNode('p',[
             LeafNode(None,'This is a cool '),
             LeafNode('i','document'),
             LeafNode(None, ' that is written\nthis is another line'),
             ]),
-            ParentNode('paragraph',[
+            ParentNode('p',[
                 LeafNode(None, 'On a computer at '),
                 LeafNode('a', 'moricorp',{'href':'moricorp.xyz'}),
+                ]),
+            ])
+
+
+        self.assertEqual(html, markdown_to_html_node(markdown))
+
+    def test_basic(self):
+        markdown = '''
+        ## The title
+
+        > This is a cool *document* that is written
+> this is another line
+
+        - On a computer at 
+- A secret location
+        '''
+        html = ParentNode('div',[
+            ParentNode('h2',[LeafNode(None,'The title')]),
+            ParentNode('blockquote',[
+            LeafNode(None,'This is a cool '),
+            LeafNode('i','document'),
+            LeafNode(None, ' that is written\nthis is another line'),
+            ]),
+            ParentNode('ul',[
+                LeafNode(None, '<li>On a computer at </li>\n<li>A secret location</li>'),
                 ]),
             ])
 
